@@ -1,0 +1,114 @@
+#! /bin/bash
+
+#------------------------------------------------------------
+#  
+#		wien2elk
+#		Version 2.0.0
+#		
+#		Usage:
+#			chmod +x wien2elk
+#			./wien2elk case.struct
+#
+#		Licence: MIT
+#		
+#		If this code was useful for you, please mention the author name or cite it via following iformation:
+#
+#				Author: Ahmad Abdolmaleki
+#				Date: 2015
+#				Title of program : WIEN2ELK
+#				Version: 2.0.0
+#				Form: Computer program
+#				
+#			
+#------------------------------------------------------------
+
+inpfile=$1
+
+case $inpfile in
+	*.struct* )  echo ;;
+	* ) echo;echo "Error:you must inter the name of structure file as case.struct*"; echo; exit ;;
+esac
+
+echo "#This file has been created by wien2elk[author:Ahmad Abdolmaleki-->ahmadubuntu@gmail.com].">elk.in
+echo "#-----------------------------------------------------------------------------------------" >> elk.in
+
+
+######################################################################################### alattice vectors
+
+
+echo "#lattice vectors: x direction has been allocated to first lattice parameter" >>elk.in
+a=`sed -n '4p' $inpfile | cut -c 1-10`
+b=`sed -n '4p' $inpfile | cut -c 11-20`
+c=`sed -n '4p' $inpfile | cut -c 21-30`
+alpha=`sed -n '4p' $inpfile | cut -c 31-40`
+betta=`sed -n '4p' $inpfile | cut -c 41-50`
+gamma=`sed -n '4p' $inpfile | cut -c 51-60`
+unit=`sed -n '3p' $inpfile | cut -c 24-27`
+
+case $unit in 
+	ang ) scale=0.52917725 ;;
+	bohr | * ) scale=1 ;;
+esac
+
+echo "#-----------------------------------------------------------------------------------------" >> elk.in
+echo "#lattice parameters [bohr]:   a=$a   b=$b  c=$c  alpha=$alpha  betta=$betta  gamma=$gamma" >> elk.in
+echo "#-----------------------------------------------------------------------------------------" >> elk.in
+
+echo "" >>elk.in
+
+pi=$(echo "scale=10; 4*a(1)" | bc -l)
+l1x=$(echo "scale=8; $a*1.00000000*$scale" | bc -l)
+l1y=0.00000000
+l1z=0.00000000
+l2x=$(echo "scale=8; $b*c($gamma*$pi/180.0)*$scale" | bc -l)
+l2y=$(echo "scale=8; $b*s($gamma*$pi/180.0)*$scale" | bc -l)
+l2z=0.00000000
+l3x=$(echo "scale=8; $c*c($betta*$pi/180.0)*$scale" | bc -l)
+l3y=$(echo "scale=8; $c*(s($gamma*$pi/180.0)*c($alpha*$pi/180.0))*$scale" | bc -l) ;
+l3z=$(echo "scale=8; sqrt (($c)^2-(($l3x)^2+($l3y)^2))*$scale" | bc -l)
+printf "avec\n" >>elk.in
+printf "%14.8f%14.8f%14.8f\n" $l1x $l1y $l1z >>elk.in
+printf "%14.8f%14.8f%14.8f\n" $l2x $l2y $l2z >>elk.in
+printf "%14.8f%14.8f%14.8f\n" $l3x $l3y $l3z >>elk.in
+echo "" >>elk.in
+
+######################################################################################### atomic positions
+
+totalline=`cat $inpfile | wc -l`
+num=`cat $inpfile | sed -n "2p" | cut -c 28-30`
+i=5
+count=1
+printf "atoms\n" >>elk.in
+printf "    %s\n" $num >>elk.in
+
+
+while [ $count -le $num ]
+do
+	m=$[i+1]
+	mult=`sed -n "${m}p" $inpfile | cut -c 17-18` ; #echo $mult
+	   
+	a=$[i+1+mult]
+	atom=`sed -n "${a}p" $inpfile |cut -c 1-2`
+	printf "    '%s.in'\n" $atom >> elk.in
+	printf "%5i\n" $mult >> elk.in
+
+	xa=`cat $inpfile | sed -n "${i}p" |	cut -c 13-22`
+	ya=`cat $inpfile | sed -n "${i}p" |	cut -c 26-31`
+	za=`cat $inpfile | sed -n "${i}p" |	cut -c 39-48`
+	printf "%14.8f%14.8f%14.8f\n" $xa $ya $za >> elk.in
+		     
+	case $[mult-1] in
+		0) i=$[i+mult+5] ; count=$[count+1] ;continue ;;
+		*) for (( j=$[i+2] ; j<=$[i+mult] ; j++)) ; do 
+				xa=`cat $inpfile | sed -n "${j}p" |	cut -c 13-22`
+				ya=`cat $inpfile | sed -n "${j}p" |	cut -c 26-31`
+				za=`cat $inpfile | sed -n "${j}p" |	cut -c 39-48`
+				printf "%14.8f%14.8f%14.8f\n" $xa $ya $za >> elk.in
+			done ;;
+	esac				     
+		    
+	i=$[i+mult+5]
+	count=$[count+1]
+done
+
+echo "The elk.in was created. Have a nice day"
